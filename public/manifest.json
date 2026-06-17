@@ -1,0 +1,11 @@
+{
+  "name": "Shotz",
+  "short_name": "Shotz",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F9FAFB",
+  "theme_color": "#0F9FEC",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
