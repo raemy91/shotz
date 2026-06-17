@@ -3,7 +3,7 @@ import {
   Film, Plus, Search, Download, Upload, Play, Share2, X, Check,
   ChevronLeft, ChevronRight, Edit3, Camera, Plane, Box,
   Mic, User, MapPin, Clock, MessageSquare, FileText, LayoutGrid,
-  List, Send, Eye, Users, Aperture
+  List, Send, Eye, Users, Aperture, Trash2, Pencil, Printer
 } from "lucide-react";
 
 const BLUE = "#0F9FEC";
@@ -33,12 +33,14 @@ function shotIcon(type) {
   return Camera;
 }
 
-const PROJECTS = [
-  { id: "p1", name: "Commercial Supercleaners", client: "Supercleaners", date: "2026-06-24", status: "In productie" },
-  { id: "p2", name: "Brandfilm Grow by Visuals", client: "Grow by Visuals", date: "2026-07-02", status: "Gepland" },
-  { id: "p3", name: "Music Video Cairo", client: "CUZZO Films", date: "2026-07-10", status: "Concept" },
-  { id: "p4", name: "Wedding Film", client: "Particulier", date: "2026-08-15", status: "Gepland" },
+const INITIAL_PROJECTS = [
+  { id: "p1", name: "Commercial Supercleaners", client: "Supercleaners", date: "2026-06-24", status: "In productie", shots: 10 },
+  { id: "p2", name: "Brandfilm Grow by Visuals", client: "Grow by Visuals", date: "2026-07-02", status: "Gepland", shots: 0 },
+  { id: "p3", name: "Music Video Cairo", client: "CUZZO Films", date: "2026-07-10", status: "Concept", shots: 0 },
+  { id: "p4", name: "Wedding Film", client: "Particulier", date: "2026-08-15", status: "Gepland", shots: 0 },
 ];
+
+const PROJECT_STATUSES = ["Concept", "Gepland", "In productie", "Afgerond"];
 
 const initialShots = [
   { id:1, num:1, scene:"1", subject:"Badkamer Marco", desc:"Establishing shot van de badkamer, Marco kijkt vol trots naar zijn schone tegels", size:"Wide Shot", type:"Establishing Shot", location:"Badkamer interieur", movement:"Static", lens:"24mm", inout:"Binnen", prep:15, start:"09:00", end:"09:20", people:1, props:"Supercleaners fles, spons", dialog:"VO: Een schone badkamer begint hier.", status:"Klaar", img:null, comments:[{role:"Client", text:"Kunnen we deze ook iets lichter belichten?"}] },
@@ -102,6 +104,7 @@ const inputCls = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm foc
 export default function Shotz() {
   const [tab, setTab] = useState("projects");
   const [role, setRole] = useState("Owner");
+  const [projects, setProjects] = useState(INITIAL_PROJECTS);
   const [activeProject, setActiveProject] = useState(null);
   const [shots, setShots] = useState(initialShots);
   const [view, setView] = useState("table");
@@ -115,6 +118,9 @@ export default function Shotz() {
   const [toast, setToast] = useState("");
   const [shootIdx, setShootIdx] = useState(0);
   const [editingShoot, setEditingShoot] = useState(false);
+  const [showNewProject, setShowNewProject] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
+  const [deletingProject, setDeletingProject] = useState(null);
 
   const canEdit = role === "Owner" || role === "Crew";
   const canEditAll = role === "Owner";
@@ -125,6 +131,30 @@ export default function Shotz() {
   React.useEffect(() => {
     if (typeof document !== "undefined") document.title = "Shotz";
   }, []);
+
+  function addProject(data) {
+    const newP = {
+      id: "p" + Date.now(),
+      name: data.name || "Naamloos project",
+      client: data.client || "Nog te bepalen",
+      date: data.date || new Date().toISOString().slice(0, 10),
+      status: data.status || "Concept",
+      shots: 0,
+    };
+    setProjects(p => [...p, newP]);
+    flash("Project aangemaakt");
+  }
+
+  function renameProject(id, name) {
+    setProjects(p => p.map(pr => pr.id === id ? { ...pr, name } : pr));
+    setActiveProject(ap => ap && ap.id === id ? { ...ap, name } : ap);
+  }
+
+  function deleteProject(id) {
+    setProjects(p => p.filter(pr => pr.id !== id));
+    setDeletingProject(null);
+    flash("Project verwijderd");
+  }
 
   function cycleStatus(id) {
     setShots(s => s.map(sh => {
@@ -206,20 +236,26 @@ export default function Shotz() {
       </header>
 
       <main className="pb-20 md:pb-6">
-        {tab === "projects" && <ProjectsTab onOpen={openProject} />}
+        {tab === "projects" && (
+          <ProjectsTab projects={projects} onOpen={openProject} canEdit={canEditAll}
+            onNew={() => setShowNewProject(true)}
+            onRename={(p) => setEditingProject(p)}
+            onDelete={(p) => setDeletingProject(p)} />
+        )}
         {tab === "shotlist" && (
           <ShotlistTab project={activeProject} shots={visibleShots} view={view} setView={setView}
             search={search} setSearch={setSearch} sortBy={sortBy} setSortBy={setSortBy}
             filterStatus={filterStatus} setFilterStatus={setFilterStatus}
             onOpenDetail={s => setDetailShot(s)} onAdd={() => setShowAdd(true)} onImport={() => setShowImport(true)}
             onExportPdf={() => setTab("pdf")} onExportExcel={() => flash("Excel export generated")}
-            cycleStatus={cycleStatus} canEdit={canEdit} doneCount={doneCount} total={shots.length} />
+            cycleStatus={cycleStatus} canEdit={canEdit} doneCount={doneCount} total={shots.length}
+            canEditAll={canEditAll} onRename={() => activeProject && setEditingProject(activeProject)} />
         )}
         {tab === "shoot" && (
           <ShootTab shots={[...shots].sort((a,b)=>a.num-b.num)} idx={shootIdx} setIdx={setShootIdx}
             cycleStatus={cycleStatus} canEdit={canEdit} onEdit={() => setEditingShoot(true)} />
         )}
-        {tab === "pdf" && <PdfTab project={activeProject} shots={shots} onDownload={() => flash("PDF export generated")} />}
+        {tab === "pdf" && <PdfTab project={activeProject} shots={shots} />}
       </main>
 
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 flex">
@@ -244,19 +280,30 @@ export default function Shotz() {
         <ShootEditModal shot={[...shots].sort((a,b)=>a.num-b.num)[shootIdx]} onClose={() => setEditingShoot(false)}
           onSave={(u) => { updateShot(u); setEditingShoot(false); flash("Shot bijgewerkt"); }} />
       )}
+      {showNewProject && <NewProjectModal onClose={() => setShowNewProject(false)} onAdd={(d) => { addProject(d); setShowNewProject(false); }} />}
+      {editingProject && <RenameProjectModal project={editingProject} onClose={() => setEditingProject(null)} onSave={(name) => { renameProject(editingProject.id, name); setEditingProject(null); flash("Projectnaam gewijzigd"); }} />}
+      {deletingProject && <DeleteProjectModal project={deletingProject} onClose={() => setDeletingProject(null)} onConfirm={() => deleteProject(deletingProject.id)} />}
       <Toast msg={toast} />
     </div>
   );
 }
 
-function ProjectsTab({ onOpen }) {
+function ProjectsTab({ projects, onOpen, canEdit, onNew, onRename, onDelete }) {
   return (
     <div className="max-w-6xl mx-auto px-3 md:px-5 pt-5">
-      <h1 className="text-xl font-bold mb-1">Projecten</h1>
+      <div className="flex items-center justify-between mb-1">
+        <h1 className="text-xl font-bold">Projecten</h1>
+        {canEdit && (
+          <button onClick={onNew} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-sm font-semibold" style={{ background: BLUE }}>
+            <Plus size={18} /> <span className="hidden sm:inline">Nieuw project</span>
+          </button>
+        )}
+      </div>
       <p className="text-sm text-gray-500 mb-5">Kies een project om de shotlist te openen</p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {PROJECTS.map(p => (
-          <div key={p.id} className="bg-white rounded-2xl border border-gray-200 p-4 hover:shadow-md transition">
+        {projects.map(p => (
+          <div key={p.id} onClick={() => onOpen(p)}
+            className="bg-white rounded-2xl border border-gray-200 p-4 hover:shadow-md hover:border-blue-300 transition cursor-pointer">
             <div className="flex items-start justify-between mb-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#EFF6FF" }}>
                 <Film size={20} style={{ color: BLUE }} />
@@ -266,17 +313,35 @@ function ProjectsTab({ onOpen }) {
             <h3 className="font-bold text-sm mb-0.5">{p.name}</h3>
             <p className="text-xs text-gray-500 mb-3">{p.client} · {new Date(p.date).toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" })}</p>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-400">{p.id === "p1" ? "10 shots" : "0 shots"}</span>
-              <button onClick={() => onOpen(p)} className="text-sm font-semibold px-3 py-1.5 rounded-lg text-white" style={{ background: BLUE }}>Open shotlist</button>
+              <span className="text-xs text-gray-400">{p.shots} shots</span>
+              <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                {canEdit && (
+                  <>
+                    <button onClick={() => onRename(p)} title="Naam wijzigen"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">
+                      <Pencil size={15} />
+                    </button>
+                    <button onClick={() => onDelete(p)} title="Verwijderen"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 transition">
+                      <Trash2 size={15} />
+                    </button>
+                  </>
+                )}
+                <button onClick={() => onOpen(p)} className="text-sm font-semibold px-3 py-1.5 rounded-lg text-white" style={{ background: BLUE }}>Open shotlist</button>
+              </div>
             </div>
           </div>
         ))}
       </div>
+      {projects.length === 0 && (
+        <div className="text-center text-gray-400 text-sm py-16">Nog geen projecten. Maak er een aan met de knop hierboven.</div>
+      )}
     </div>
   );
 }
 
 function projectStatusColor(status) {
+  if (status === "Afgerond") return GREEN;
   if (status === "In productie") return ORANGE;
   if (status === "Gepland") return GRAY;
   return BLUE;
@@ -285,12 +350,20 @@ function projectStatusColor(status) {
 function ShotlistTab(props) {
   const { project, shots, view, setView, search, setSearch, sortBy, setSortBy,
     filterStatus, setFilterStatus, onOpenDetail, onAdd, onImport, onExportPdf,
-    onExportExcel, cycleStatus, canEdit, doneCount, total } = props;
+    onExportExcel, cycleStatus, canEdit, doneCount, total, canEditAll, onRename } = props;
   return (
     <div className="max-w-7xl mx-auto px-3 md:px-5 pt-4">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h1 className="text-lg md:text-xl font-bold">{project ? project.name : "Commercial Supercleaners"}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg md:text-xl font-bold">{project ? project.name : "Commercial Supercleaners"}</h1>
+            {canEditAll && project && (
+              <button onClick={onRename} title="Projectnaam wijzigen"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">
+                <Pencil size={14} />
+              </button>
+            )}
+          </div>
           <p className="text-xs text-gray-500">{total} shots · {doneCount} klaar</p>
         </div>
         <button onClick={() => setView(view === "table" ? "storyboard" : "table")}
@@ -656,20 +729,57 @@ function ShootEditModal({ shot, onClose, onSave }) {
   );
 }
 
-function PdfTab({ project, shots, onDownload }) {
+function PdfTab({ project, shots }) {
   const sorted = [...shots].sort((a,b)=>a.num-b.num);
+  const projName = project ? project.name : "Commercial Supercleaners";
+  const projClient = project ? project.client : "Supercleaners";
+
+  function downloadPdf() {
+    const rows = sorted.map(s => `
+      <tr>
+        <td>${s.num}</td>
+        <td>${s.size || ""}</td>
+        <td>${s.type || ""}</td>
+        <td>${s.location || ""}</td>
+        <td>${(s.desc || "").replace(/</g, "&lt;")}</td>
+        <td>${s.start || ""}</td>
+        <td>${s.end || ""}</td>
+      </tr>`).join("");
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Shotz - ${projName}</title>
+      <style>
+        body{font-family:-apple-system,system-ui,sans-serif;color:#0A0A0A;padding:24px;}
+        h1{font-size:20px;margin:0 0 2px;}
+        .sub{color:#666;font-size:12px;margin-bottom:16px;}
+        table{width:100%;border-collapse:collapse;font-size:11px;}
+        th{text-align:left;text-transform:uppercase;color:#666;border-bottom:2px solid #0A0A0A;padding:6px 4px;}
+        td{border-bottom:1px solid #eee;padding:6px 4px;vertical-align:top;}
+        thead{display:table-header-group;}
+      </style></head><body>
+      <h1>Shotz — ${projName}</h1>
+      <div class="sub">${projClient} · ${new Date().toLocaleDateString("nl-NL")}</div>
+      <table><thead><tr>
+        <th>#</th><th>Size</th><th>Type</th><th>Location</th><th>Action</th><th>Start</th><th>End</th>
+      </tr></thead><tbody>${rows}</tbody></table>
+      </body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => { w.print(); }, 400);
+  }
+
   return (
     <div className="max-w-5xl mx-auto px-3 md:px-5 pt-4">
       <div className="flex items-center justify-between mb-3">
         <h1 className="text-lg md:text-xl font-bold">PDF Preview</h1>
         <div className="flex gap-2">
-          <button className="px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hidden sm:block">Layout</button>
-          <button className="px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hidden sm:block">Style</button>
-          <button onClick={onDownload} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-white text-sm font-semibold" style={{ background: BLUE }}>
-            <Download size={16} /> Download PDF
+          <button onClick={downloadPdf} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-white text-sm font-semibold" style={{ background: BLUE }}>
+            <Printer size={16} /> Download PDF
           </button>
         </div>
       </div>
+      <p className="text-xs text-gray-500 mb-3">Tip: kies in het printvenster "Opslaan als PDF" als bestemming. Werkt op laptop en telefoon.</p>
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-8 overflow-x-auto">
         <div className="flex items-center justify-between mb-5 pb-4 border-b-2" style={{ borderColor: DARK }}>
           <div className="flex items-center gap-2">
@@ -677,8 +787,8 @@ function PdfTab({ project, shots, onDownload }) {
             <span className="font-bold text-lg">Shotz</span>
           </div>
           <div className="text-right text-xs text-gray-500">
-            <p className="font-semibold text-gray-900">{project ? project.name : "Commercial Supercleaners"}</p>
-            <p>{project ? project.client : "Supercleaners"}</p>
+            <p className="font-semibold text-gray-900">{projName}</p>
+            <p>{projClient}</p>
             <p>{new Date().toLocaleDateString("nl-NL")}</p>
           </div>
         </div>
@@ -714,6 +824,61 @@ function PdfTab({ project, shots, onDownload }) {
         <p className="text-right text-xs text-gray-400 mt-4">1 of 1</p>
       </div>
     </div>
+  );
+}
+
+function NewProjectModal({ onClose, onAdd }) {
+  const [f, setF] = useState({ name: "", client: "", date: new Date().toISOString().slice(0,10), status: "Concept" });
+  const set = (k,v) => setF(p => ({ ...p, [k]: v }));
+  return (
+    <Modal onClose={onClose} title="Nieuw project" subtitle="Vul de basisgegevens in">
+      <div className="space-y-3">
+        <Field label="Projectnaam"><input value={f.name} onChange={e=>set("name",e.target.value)} className={inputCls} placeholder="Bijv. Commercial Supercleaners" autoFocus /></Field>
+        <Field label="Klant"><input value={f.client} onChange={e=>set("client",e.target.value)} className={inputCls} placeholder="Bijv. Supercleaners" /></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Datum"><input type="date" value={f.date} onChange={e=>set("date",e.target.value)} className={inputCls} /></Field>
+          <Field label="Status"><select value={f.status} onChange={e=>set("status",e.target.value)} className={inputCls}>{PROJECT_STATUSES.map(o=><option key={o}>{o}</option>)}</select></Field>
+        </div>
+      </div>
+      <div className="flex gap-2 mt-5">
+        <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 font-semibold text-sm">Annuleren</button>
+        <button onClick={() => f.name.trim() && onAdd(f)} className="flex-1 py-2.5 rounded-xl text-white font-semibold text-sm" style={{ background: BLUE }}>Project aanmaken</button>
+      </div>
+    </Modal>
+  );
+}
+
+function RenameProjectModal({ project, onClose, onSave }) {
+  const [name, setName] = useState(project.name);
+  return (
+    <Modal onClose={onClose} title="Projectnaam wijzigen" subtitle={project.name}>
+      <Field label="Nieuwe naam">
+        <input value={name} onChange={e=>setName(e.target.value)} className={inputCls} autoFocus
+          onKeyDown={e=>{ if(e.key==="Enter" && name.trim()) onSave(name.trim()); }} />
+      </Field>
+      <div className="flex gap-2 mt-5">
+        <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 font-semibold text-sm">Annuleren</button>
+        <button onClick={() => name.trim() && onSave(name.trim())} className="flex-1 py-2.5 rounded-xl text-white font-semibold text-sm" style={{ background: BLUE }}>Opslaan</button>
+      </div>
+    </Modal>
+  );
+}
+
+function DeleteProjectModal({ project, onClose, onConfirm }) {
+  return (
+    <Modal onClose={onClose} title="Project verwijderen" subtitle={project.name}>
+      <div className="flex flex-col items-center text-center py-2">
+        <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3" style={{ background: "#FEF2F2" }}>
+          <Trash2 size={22} style={{ color: RED }} />
+        </div>
+        <p className="text-sm text-gray-700">Weet je zeker dat je <span className="font-semibold">{project.name}</span> wilt verwijderen?</p>
+        <p className="text-xs text-gray-400 mt-1">Dit kan niet ongedaan worden gemaakt.</p>
+      </div>
+      <div className="flex gap-2 mt-5">
+        <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 font-semibold text-sm">Annuleren</button>
+        <button onClick={onConfirm} className="flex-1 py-2.5 rounded-xl text-white font-semibold text-sm" style={{ background: RED }}>Verwijderen</button>
+      </div>
+    </Modal>
   );
 }
 
