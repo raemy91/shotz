@@ -25,6 +25,14 @@ function nextShotNumber(shots) {
   return shots.length ? Math.max(...shots.map(s => s.num)) + 1 : 1;
 }
 
+function slugify(name) {
+  return (name || "project")
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "project";
+}
+
 function shotIcon(type) {
   if (type === "Drone Shot") return Plane;
   if (type === "Product Shot" || type === "Detail" || type === "Insert") return Box;
@@ -145,9 +153,9 @@ export default function Shotz() {
     flash("Project aangemaakt");
   }
 
-  function renameProject(id, name) {
-    setProjects(p => p.map(pr => pr.id === id ? { ...pr, name } : pr));
-    setActiveProject(ap => ap && ap.id === id ? { ...ap, name } : ap);
+  function saveProject(id, data) {
+    setProjects(p => p.map(pr => pr.id === id ? { ...pr, ...data } : pr));
+    setActiveProject(ap => ap && ap.id === id ? { ...ap, ...data } : ap);
   }
 
   function deleteProject(id) {
@@ -274,14 +282,17 @@ export default function Shotz() {
           onComment={(t) => { addComment(detailShot.id, t); }} />
       )}
       {showAdd && <AddShotModal onClose={() => setShowAdd(false)} onAdd={(d) => { addShot(d); setShowAdd(false); }} nextNum={nextShotNumber(shots)} />}
-      {showShare && <ShareModal onClose={() => setShowShare(false)} role={role} setRole={setRole} flash={flash} />}
+      {showShare && <ShareModal onClose={() => setShowShare(false)} role={role} setRole={setRole} flash={flash} project={activeProject} />}
       {showImport && <ImportModal onClose={() => setShowImport(false)} onDone={(t) => { setShowImport(false); flash(t); }} />}
       {editingShoot && (
         <ShootEditModal shot={[...shots].sort((a,b)=>a.num-b.num)[shootIdx]} onClose={() => setEditingShoot(false)}
           onSave={(u) => { updateShot(u); setEditingShoot(false); flash("Shot bijgewerkt"); }} />
       )}
       {showNewProject && <NewProjectModal onClose={() => setShowNewProject(false)} onAdd={(d) => { addProject(d); setShowNewProject(false); }} />}
-      {editingProject && <RenameProjectModal project={editingProject} onClose={() => setEditingProject(null)} onSave={(name) => { renameProject(editingProject.id, name); setEditingProject(null); flash("Projectnaam gewijzigd"); }} />}
+      {editingProject && <EditProjectModal project={editingProject}
+        onClose={() => setEditingProject(null)}
+        onSave={(data) => { saveProject(editingProject.id, data); setEditingProject(null); flash("Project bijgewerkt"); }}
+        onOpenShotlist={() => { openProject(editingProject); setEditingProject(null); }} />}
       {deletingProject && <DeleteProjectModal project={deletingProject} onClose={() => setDeletingProject(null)} onConfirm={() => deleteProject(deletingProject.id)} />}
       <Toast msg={toast} />
     </div>
@@ -567,7 +578,9 @@ function AddShotModal({ onClose, onAdd, nextNum }) {
   );
 }
 
-function ShareModal({ onClose, role, setRole, flash }) {
+function ShareModal({ onClose, role, setRole, flash, project }) {
+  const slug = slugify(project ? project.name : "commercial-supercleaners");
+  const shareLink = `https://shotz.app/s/${slug}`;
   const rights = {
     Owner: ["Alles bekijken", "Alles bewerken", "Exporteren / importeren", "Delen"],
     Crew: ["Bekijken", "Shots afvinken", "Notities toevoegen", "Shot details bekijken"],
@@ -580,7 +593,7 @@ function ShareModal({ onClose, role, setRole, flash }) {
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Deelbare link</label>
           <div className="flex gap-2">
-            <input readOnly value="https://shotz.app/s/supercleaners-x8f2" className={inputCls + " bg-gray-50"} />
+            <input readOnly value={shareLink} className={inputCls + " bg-gray-50"} />
             <button onClick={() => flash("Link gekopieerd")} className="px-3 rounded-lg text-white text-sm font-semibold" style={{ background: BLUE }}>Kopieer</button>
           </div>
         </div>
@@ -833,11 +846,11 @@ function NewProjectModal({ onClose, onAdd }) {
   return (
     <Modal onClose={onClose} title="Nieuw project" subtitle="Vul de basisgegevens in">
       <div className="space-y-3">
-        <Field label="Projectnaam"><input value={f.name} onChange={e=>set("name",e.target.value)} className={inputCls} placeholder="Bijv. Commercial Supercleaners" autoFocus /></Field>
-        <Field label="Klant"><input value={f.client} onChange={e=>set("client",e.target.value)} className={inputCls} placeholder="Bijv. Supercleaners" /></Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Datum"><input type="date" value={f.date} onChange={e=>set("date",e.target.value)} className={inputCls} /></Field>
-          <Field label="Status"><select value={f.status} onChange={e=>set("status",e.target.value)} className={inputCls}>{PROJECT_STATUSES.map(o=><option key={o}>{o}</option>)}</select></Field>
+        <Field label="Projectnaam"><input value={f.name} onChange={e=>set("name",e.target.value)} className={inputCls} placeholder="Naam van het project" autoFocus /></Field>
+        <Field label="Klant"><input value={f.client} onChange={e=>set("client",e.target.value)} className={inputCls} placeholder="Naam van de klant" /></Field>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field label="Datum"><input type="date" value={f.date} onChange={e=>set("date",e.target.value)} className={inputCls + " min-w-0"} /></Field>
+          <Field label="Status"><select value={f.status} onChange={e=>set("status",e.target.value)} className={inputCls + " min-w-0"}>{PROJECT_STATUSES.map(o=><option key={o}>{o}</option>)}</select></Field>
         </div>
       </div>
       <div className="flex gap-2 mt-5">
@@ -848,17 +861,30 @@ function NewProjectModal({ onClose, onAdd }) {
   );
 }
 
-function RenameProjectModal({ project, onClose, onSave }) {
-  const [name, setName] = useState(project.name);
+function EditProjectModal({ project, onClose, onSave, onOpenShotlist }) {
+  const [f, setF] = useState({
+    name: project.name,
+    client: project.client || "",
+    date: project.date || new Date().toISOString().slice(0,10),
+    status: project.status || "Concept",
+  });
+  const set = (k,v) => setF(p => ({ ...p, [k]: v }));
   return (
-    <Modal onClose={onClose} title="Projectnaam wijzigen" subtitle={project.name}>
-      <Field label="Nieuwe naam">
-        <input value={name} onChange={e=>setName(e.target.value)} className={inputCls} autoFocus
-          onKeyDown={e=>{ if(e.key==="Enter" && name.trim()) onSave(name.trim()); }} />
-      </Field>
+    <Modal onClose={onClose} title="Project bewerken" subtitle={project.name}>
+      <div className="space-y-3">
+        <Field label="Projectnaam"><input value={f.name} onChange={e=>set("name",e.target.value)} className={inputCls} autoFocus /></Field>
+        <Field label="Klant"><input value={f.client} onChange={e=>set("client",e.target.value)} className={inputCls} placeholder="Naam van de klant" /></Field>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field label="Datum"><input type="date" value={f.date} onChange={e=>set("date",e.target.value)} className={inputCls + " min-w-0"} /></Field>
+          <Field label="Status"><select value={f.status} onChange={e=>set("status",e.target.value)} className={inputCls + " min-w-0"}>{PROJECT_STATUSES.map(o=><option key={o}>{o}</option>)}</select></Field>
+        </div>
+        <button onClick={onOpenShotlist} className="w-full py-2.5 rounded-xl border border-gray-200 font-semibold text-sm flex items-center justify-center gap-2 text-gray-700 hover:bg-gray-50">
+          <List size={16} /> Shotlist openen
+        </button>
+      </div>
       <div className="flex gap-2 mt-5">
         <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 font-semibold text-sm">Annuleren</button>
-        <button onClick={() => name.trim() && onSave(name.trim())} className="flex-1 py-2.5 rounded-xl text-white font-semibold text-sm" style={{ background: BLUE }}>Opslaan</button>
+        <button onClick={() => f.name.trim() && onSave(f)} className="flex-1 py-2.5 rounded-xl text-white font-semibold text-sm" style={{ background: BLUE }}>Opslaan</button>
       </div>
     </Modal>
   );
