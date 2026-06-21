@@ -678,7 +678,7 @@ function ShootTab({ shots, idx, setIdx, cycleStatus, canEdit, onEdit }) {
         <p className="text-sm text-gray-700 mt-3 bg-gray-50 rounded-lg p-3">{current.desc}</p>
         {canEdit && (
           <button onClick={onEdit} className="w-full mt-4 py-2.5 rounded-xl border border-gray-200 font-semibold text-sm flex items-center justify-center gap-2">
-            <Edit3 size={16} /> Edit current shot
+            <Edit3 size={16} /> Bewerk dit shot
           </button>
         )}
         <button onClick={() => cycleStatus(current.id)}
