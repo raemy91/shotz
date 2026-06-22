@@ -11,7 +11,7 @@ import {
 // Je URL staat hieronder al ingevuld.
 // Vul bij SUPABASE_KEY je eigen "anon public" key in (tussen de aanhalingstekens).
 const SUPABASE_URL = "https://suxhjxcrgnootnlhdjcx.supabase.co";
-const SUPABASE_KEY = "PLAK_HIER_JE_ANON_PUBLIC_KEY";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN1eGhqeGNyZ25vb3RubGhkamN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwMzYwMTAsImV4cCI6MjA5NzYxMjAxMH0.tZyJo_wpffB8jtyF1fYA21ZU0Sa1_mXhsRAG9NgNYwM";
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 // ===================================
 
