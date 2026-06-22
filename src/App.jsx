@@ -1,10 +1,19 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import { createClient } from "@supabase/supabase-js";
 import {
   Film, Plus, Search, Download, Upload, Play, Share2, X, Check,
   ChevronLeft, ChevronRight, Edit3, Camera, Plane, Box,
   Mic, User, MapPin, Clock, MessageSquare, FileText, LayoutGrid,
   List, Send, Eye, Users, Aperture, Trash2, Pencil, Printer
 } from "lucide-react";
+
+// ====== SUPABASE INSTELLINGEN ======
+// Je URL staat hieronder al ingevuld.
+// Vul bij SUPABASE_KEY je eigen "anon public" key in (tussen de aanhalingstekens).
+const SUPABASE_URL = "https://suxhjxcrgnootnlhdjcx.supabase.co";
+const SUPABASE_KEY = "PLAK_HIER_JE_ANON_PUBLIC_KEY";
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+// ===================================
 
 const BLUE = "#0F9FEC";
 const DARK = "#0A0A0A";
@@ -130,13 +139,56 @@ export default function Shotz() {
   const [editingProject, setEditingProject] = useState(null);
   const [deletingProject, setDeletingProject] = useState(null);
 
+  // ====== SUPABASE: laden & opslaan ======
+  const [loaded, setLoaded] = useState(false);
+  const saveTimer = useRef(null);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const { data: pRow } = await supabase
+          .from("projects").select("data").eq("slug", "shotz-main").maybeSingle();
+        const { data: sRow } = await supabase
+          .from("projects").select("data").eq("slug", "shotz-shots").maybeSingle();
+
+        if (pRow && pRow.data) setProjects(pRow.data);
+        if (sRow && sRow.data) setShots(sRow.data);
+      } catch (e) {
+        console.error("Laden mislukt:", e);
+      } finally {
+        setLoaded(true);
+      }
+    }
+    load();
+  }, []);
+
+  useEffect(() => {
+    if (!loaded) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      try {
+        await supabase.from("projects").upsert(
+          { slug: "shotz-main", name: "Shotz projecten", data: projects },
+          { onConflict: "slug" }
+        );
+        await supabase.from("projects").upsert(
+          { slug: "shotz-shots", name: "Shotz shots", data: shots },
+          { onConflict: "slug" }
+        );
+      } catch (e) {
+        console.error("Opslaan mislukt:", e);
+      }
+    }, 600);
+  }, [projects, shots, loaded]);
+  // =======================================
+
   const canEdit = role === "Owner" || role === "Crew";
   const canEditAll = role === "Owner";
   const canComment = role !== "Viewer";
 
   function flash(msg) { setToast(msg); setTimeout(() => setToast(""), 1800); }
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (typeof document !== "undefined") document.title = "Shotz";
   }, []);
 
